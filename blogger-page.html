@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TR YouTube 24H Live Studio</title>
+<!--
+  TR YOUTUBE 24H LIVE STUDIO — Blogger page
+  HOW TO USE IN BLOGGER:
+  1. Blogger Dashboard → Pages → New Page → HTML view → paste this WHOLE file.
+  2. Or Theme → Customize → Add a Gadget → HTML/JavaScript → paste this file.
+  3. Set BACKEND_URL below to your VPS: http://YOUR-VPS-IP:5000
+     (use https via Nginx / Cloudflare Tunnel in production)
+  4. Paste your Admin Token (TR_LIVE_ADMIN_TOKEN from the server .env).
+  5. Publish. The page talks to your Python backend — Blogger itself
+     NEVER runs FFmpeg or streams. The VPS does the 24h streaming.
+
+  SECURITY: never paste your YouTube Stream Key into Blogger, a comment,
+  or any AI chat. Paste it only in the Stream Settings form below — it is
+  sent to YOUR backend only, stored there, and never shown in full again.
+-->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#070b16;color:#e8ecf5}
+.wrap{max-width:980px;margin:0 auto;padding:18px}
+.brand{display:flex;gap:10px;align-items:center}.brand .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#7c3aed,#2563eb);font-size:20px}
+.card{background:rgba(255,255,255,.04);border:1px solid #1e2a4a;border-radius:16px;padding:16px;margin:14px 0}
+.card h2{margin:0 0 10px;font-size:17px}.muted{color:#93a4c8;font-size:13px;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.stat label{display:block;color:#93a4c8;font-size:12px}.stat strong{font-size:18px}
+.btn{background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:0;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer}
+.btn.live{background:linear-gradient(135deg,#dc2626,#ef4444)}.btn.danger{background:#3f1d1d;border:1px solid #ef4444;color:#fecaca}.btn.warn{background:#3a2f10;border:1px solid #f59e0b;color:#fde68a}
+.btn:disabled{opacity:.5}input,select,textarea{width:100%;background:#0f1730;border:1px solid #26355e;color:#e8ecf5;border-radius:9px;padding:10px;margin:6px 0 12px}
+label{font-size:13px;color:#c6d2ea}.pill{display:inline-flex;gap:8px;align-items:center;background:#131b33;border:1px solid #26355e;padding:8px 14px;border-radius:999px;font-weight:700}
+.pill.live{border-color:#22c55e;color:#bbf7d0}.dot{width:10px;height:10px;border-radius:50%;background:#ef4444}.pill.live .dot{background:#22c55e}
+.drop{border:2px dashed #3b4a73;border-radius:14px;padding:22px;text-align:center}
+.logs{background:#05070f;border:1px solid #1e2a4a;border-radius:12px;padding:12px;max-height:380px;overflow:auto;white-space:pre-wrap;font-size:12px;line-height:1.6}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="logo">▶</span><div><strong>TR YOUTUBE LIVE STUDIO</strong><div class="muted">Blogger Dashboard • VPS streams 24/7 • Blogger never streams</div></div>
+  <span class="pill" id="pill" style="margin-left:auto"><span class="dot"></span><span id="pillText">OFFLINE</span></span></div>
+
+  <div class="card">
+    <h2><i class="fa-solid fa-plug"></i> Backend Connection</h2>
+    <label>Backend URL <input id="backendUrl" value="http://YOUR-VPS-IP:5000" placeholder="http://YOUR-VPS-IP:5000"></label>
+    <label>Admin Token <input id="adminToken" type="password" placeholder="TR_LIVE_ADMIN_TOKEN from server .env"></label>
+    <button class="btn" id="saveConn">Save &amp; Connect</button>
+    <span class="muted" id="connMsg"></span>
+  </div>
+
+  <div class="card"><div class="grid">
+    <div class="stat"><label>Status</label><strong id="stLive">OFFLINE</strong></div>
+    <div class="stat"><label>Live Duration</label><strong id="stElapsed">00:00:00</strong></div>
+    <div class="stat"><label>Remaining</label><strong id="stRemaining">—</strong></div>
+    <div class="stat"><label>Video</label><strong id="stVideo">No video</strong></div>
+    <div class="stat"><label>Size</label><strong id="stSize">—</strong></div>
+    <div class="stat"><label>Resolution</label><strong id="stRes">—</strong></div>
+    <div class="stat"><label>CPU</label><strong id="stCpu">—</strong></div>
+    <div class="stat"><label>RAM</label><strong id="stRam">—</strong></div>
+  </div></div>
+
+  <div class="card">
+    <h2><i class="fa-solid fa-tower-broadcast"></i> Streaming Control</h2>
+    <div class="row">
+      <button class="btn live" id="btnStart">▶ START LIVE</button>
+      <button class="btn danger" id="btnStop">■ STOP LIVE</button>
+      <button class="btn warn" id="btnRestart">↻ RESTART LIVE</button>
+    </div>
+    <p class="muted" id="note">Start validates video + backend + RTMP + key, then FFmpeg loops the video on the server.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="fa-solid fa-cloud-arrow-up"></i> Video Upload</h2>
+    <div class="drop" id="drop">Drag &amp; drop MP4 / MKV / MOV here, or <label style="color:#a78bfa;cursor:pointer;text-decoration:underline">browse<input type="file" id="fileInput" accept=".mp4,.mkv,.mov" hidden></label></div>
+    <p class="muted" id="uploadInfo"></p>
+    <video id="preview" controls style="width:100%;max-height:320px;display:none;background:#000;border-radius:12px"></video>
+  </div>
+
+  <div class="card">
+    <h2><i class="fa-brands fa-youtube"></i> YouTube Stream Settings</h2>
+    <form id="settingsForm">
+      <label>RTMP Server URL <input name="rtmp_url" value="rtmp://a.rtmp.youtube.com/live2" required></label>
+      <label>Stream Key <input name="stream_key" type="password" placeholder="Paste from YouTube Studio — sent to YOUR server only" autocomplete="off"></label>
+      <small class="muted" id="keyHint">Saved key: not set yet.</small>
+      <label>Stream Title <input name="title" value="TR Live 24/7"></label>
+      <div class="row"><div style="flex:1"><label>Resolution <select name="resolution"><option>480p</option><option selected>720p</option><option>1080p</option></select></label></div>
+      <div style="flex:1"><label>FPS <select name="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label></div>
+      <div style="flex:1"><label>Duration (hours) <input name="duration_hours" type="number" min="1" max="24" value="24"></label></div></div>
+      <div class="row"><div style="flex:1"><label>Video Bitrate <select name="video_bitrate_kbps"><option value="1500">1500 kbps</option><option value="2500" selected>2500 kbps</option><option value="4500">4500 kbps</option><option value="6000">6000 kbps</option></select></label></div>
+      <div style="flex:1"><label>Audio Bitrate <select name="audio_bitrate_kbps"><option value="128" selected>128 kbps</option><option value="160">160 kbps</option><option value="192">192 kbps</option></select></label></div></div>
+      <button class="btn" type="submit">Save Settings</button>
+    </form>
+  </div>
+
+  <div class="card"><h2><i class="fa-solid fa-list"></i> Live Logs</h2><pre class="logs" id="logBox">Connect the backend to load logs…</pre></div>
+  <p class="muted">Only broadcast videos you own or have permission to broadcast. Follow YouTube Live Streaming rules. Your PC can be off — the VPS keeps streaming.</p>
+</div>
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  let BACKEND=localStorage.getItem('tr_live_backend')||'';
+  let TOKEN=localStorage.getItem('tr_live_token')||'';
+  if(BACKEND) $('#backendUrl').value=BACKEND; if(TOKEN) $('#adminToken').value=TOKEN;
+  function headers(){return {'Content-Type':'application/json','X-Admin-Token':TOKEN};}
+  async function api(p,o){const r=await fetch(BACKEND.replace(/\/$/,'')+p,{...o,headers:{...headers(),...((o&&o.headers)||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d;}
+  function fmt(s){s=Math.max(0,Math.floor(s));return String(Math.floor(s/3600)).padStart(2,'0')+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+  function fmtSize(b){if(!b)return '—';return b>1e9?(b/1e9).toFixed(2)+' GB':(b/1e6).toFixed(1)+' MB';}
+  $('#saveConn').onclick=()=>{BACKEND=$('#backendUrl').value.trim();TOKEN=$('#adminToken').value.trim();localStorage.setItem('tr_live_backend',BACKEND);localStorage.setItem('tr_live_token',TOKEN);$('#connMsg').textContent='Saved. Checking…';refresh();};
+  async function refresh(){
+    try{const d=await api('/api/status');const s=d.status;
+      $('#pill').classList.toggle('live',s.live);$('#pillText').textContent=s.live?'● LIVE':'OFFLINE';
+      $('#stLive').textContent=s.live?'● LIVE':'OFFLINE';$('#stElapsed').textContent=fmt(s.elapsed_seconds);
+      $('#stRemaining').textContent=s.live?fmt(s.remaining_seconds):'—';$('#stVideo').textContent=s.video_name||'No video';
+      $('#stSize').textContent=fmtSize(s.video_size);$('#stRes').textContent=s.video_resolution||'—';
+      $('#connMsg').textContent='Connected ✓';
+      if(s.settings){const f=$('#settingsForm');f.rtmp_url.value=s.settings.rtmp_url||f.rtmp_url.value;f.title.value=s.settings.title||'';$('#keyHint').textContent='Saved key: '+(s.settings.stream_key||'not set yet');}
+    }catch(e){$('#pill').classList.remove('live');$('#pillText').textContent='BACKEND OFFLINE';$('#stLive').textContent='BACKEND OFFLINE';$('#connMsg').textContent='Cannot reach backend: '+e.message;}
+    try{const st=await api('/api/server-stats');$('#stCpu').textContent=st.cpu_percent!=null?st.cpu_percent.toFixed(1)+'%':'—';$('#stRam').textContent=st.memory?st.memory.percent.toFixed(0)+'%':'—';}catch(e){}
+    try{const l=await api('/api/logs');$('#logBox').textContent=l.logs.map(x=>x.time+' ['+x.level+'] '+x.message).join('\n')||'No logs yet.';}catch(e){}
+  }
+  $('#btnStart').onclick=async()=>{try{await api('/api/start',{method:'POST',body:'{}'});$('#note').textContent='LIVE started — confirm in YouTube Studio → Go Live.';refresh();}catch(e){alert('Start failed: '+e.message);}};
+  $('#btnStop').onclick=async()=>{if(!confirm('Stop the live stream?'))return;try{await api('/api/stop',{method:'POST',body:'{}'});refresh();}catch(e){alert('Stop failed: '+e.message);}};
+  $('#btnRestart').onclick=async()=>{try{await api('/api/restart',{method:'POST',body:'{}'});refresh();}catch(e){alert('Restart failed: '+e.message);}};
+  $('#settingsForm').onsubmit=async ev=>{ev.preventDefault();const fd=new FormData(ev.target);const b={};fd.forEach((v,k)=>b[k]=v);b.fps=parseInt(b.fps);b.video_bitrate_kbps=parseInt(b.video_bitrate_kbps);b.audio_bitrate_kbps=parseInt(b.audio_bitrate_kbps);b.duration_hours=parseFloat(b.duration_hours);try{await api('/api/settings',{method:'POST',body:JSON.stringify(b)});alert('Settings saved. Stream key stored on server only.');refresh();}catch(e){alert('Save failed: '+e.message);}};
+  function upload(f){if(!/\.(mp4|mkv|mov)$/i.test(f.name))return alert('Only MP4, MKV or MOV.');const fd=new FormData();fd.append('video',f);const x=new XMLHttpRequest();x.open('POST',BACKEND.replace(/\/$/,'')+'/api/upload');x.setRequestHeader('X-Admin-Token',TOKEN);x.upload.onprogress=e=>{if(e.lengthComputable)$('#uploadInfo').textContent='Uploading… '+Math.round(e.loaded/e.total*100)+'%';};x.onload=()=>{let d={};try{d=JSON.parse(x.responseText);}catch(e){}if(x.status>=400)return alert(d.error||'Upload failed.');$('#uploadInfo').textContent='Uploaded: '+d.video.name+' • '+fmtSize(d.video.size);const p=$('#preview');p.style.display='block';p.src=URL.createObjectURL(f);refresh();};x.onerror=()=>alert('Upload failed — is the backend running?');x.send(fd);}
+  $('#fileInput').onchange=e=>{if(e.target.files[0])upload(e.target.files[0]);};
+  const drop=$('#drop');drop.ondragover=e=>e.preventDefault();drop.ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0]);};
+  if(BACKEND&&TOKEN) refresh(); setInterval(refresh,5000);
+})();
+</script>
+</body>
+</html>

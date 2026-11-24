@@ -1,0 +1,14 @@
+# Render.com 1-click deploy — no terminal needed.
+# Steps: push this folder to GitHub -> render.com -> New + -> Web Service
+# -> pick the repo -> Render reads this file -> set TR_LIVE_ADMIN_TOKEN -> Deploy.
+services:
+  - type: web
+    name: tr-youtube-live-studio
+    env: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: TR_LIVE_ADMIN_TOKEN
+        generateValue: true
+      - key: MAX_UPLOAD_MB
+        value: "4096"

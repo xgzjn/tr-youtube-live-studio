@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TR YouTube 24H Live Studio</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">▶</span><div><strong>TR YOUTUBE</strong><span>LIVE STUDIO</span></div></div>
+    <nav>
+      <button class="nav active" data-page="dashboard"><i class="fa-solid fa-gauge"></i> Dashboard</button>
+      <button class="nav" data-page="upload"><i class="fa-solid fa-cloud-arrow-up"></i> Video Upload</button>
+      <button class="nav" data-page="settings"><i class="fa-solid fa-gear"></i> Stream Settings</button>
+      <button class="nav" data-page="monitor"><i class="fa-solid fa-chart-line"></i> Live Monitor</button>
+      <button class="nav" data-page="logs"><i class="fa-solid fa-list"></i> Logs</button>
+    </nav>
+    <div class="side-foot">
+      <p>Backend</p>
+      <input id="backendUrl" value="http://localhost:5000" placeholder="http://YOUR-VPS-IP:5000">
+      <input id="adminToken" type="password" placeholder="Admin Token (X-Admin-Token)">
+      <button id="saveConn" class="btn small">Save Connection</button>
+      <small>Stream key is never shown in full. It lives only on your server.</small>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <h1>TR YouTube 24H Live Studio</h1>
+      <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">OFFLINE</span></div>
+    </header>
+
+    <div id="alert" class="alert hidden"></div>
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <div class="grid stats">
+        <div class="card"><label>Streaming Status</label><strong id="stLive">OFFLINE</strong></div>
+        <div class="card"><label>Live Duration</label><strong id="stElapsed">00:00:00</strong></div>
+        <div class="card"><label>Remaining</label><strong id="stRemaining">—</strong></div>
+        <div class="card"><label>Selected Video</label><strong id="stVideo">No video</strong><small id="stVideoMeta"></small></div>
+        <div class="card"><label>Video Size</label><strong id="stSize">—</strong></div>
+        <div class="card"><label>Video Resolution</label><strong id="stRes">—</strong></div>
+        <div class="card"><label>Server CPU</label><strong id="stCpu">—</strong></div>
+        <div class="card"><label>Server RAM</label><strong id="stRam">—</strong></div>
+        <div class="card"><label>Connection</label><strong id="stConn">—</strong></div>
+      </div>
+
+      <div class="card controls">
+        <h2><i class="fa-solid fa-tower-broadcast"></i> Streaming Control</h2>
+        <p class="muted">Start validates video, backend, RTMP URL and stream key — then starts FFmpeg on the server with infinite loop.</p>
+        <div class="btn-row">
+          <button id="btnStart" class="btn live"><i class="fa-solid fa-play"></i> START LIVE</button>
+          <button id="btnStop" class="btn danger"><i class="fa-solid fa-stop"></i> STOP LIVE</button>
+          <button id="btnRestart" class="btn warn"><i class="fa-solid fa-rotate-right"></i> RESTART LIVE</button>
+        </div>
+        <p id="liveNote" class="muted"></p>
+      </div>
+
+      <div class="card">
+        <h2>Quick Setup</h2>
+        <ol class="steps">
+          <li>Upload a video (Video Upload page) — MP4 / MKV / MOV.</li>
+          <li>Stream Settings — paste YouTube RTMP URL + Stream Key, choose 720p / 30fps / 2500 kbps, duration 24h.</li>
+          <li>Click <strong>START LIVE</strong>. Confirm in YouTube Studio → Go Live.</li>
+          <li>Your PC can close — the VPS keeps looping the video for 24 hours.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- UPLOAD -->
+    <section class="page" id="page-upload">
+      <div class="card">
+        <h2><i class="fa-solid fa-cloud-arrow-up"></i> Video Upload</h2>
+        <div id="dropZone" class="drop">
+          <i class="fa-solid fa-film"></i>
+          <p><strong>Drag &amp; drop your video here</strong><br>or</p>
+          <label class="btn">Browse Video <input type="file" id="fileInput" accept=".mp4,.mkv,.mov,video/mp4,video/x-matroska,video/quicktime" hidden></label>
+          <small>MP4, MKV, MOV • uploaded to the server (not browser storage)</small>
+        </div>
+        <div id="uploadProgress" class="progress hidden"><div id="uploadBar"></div></div>
+        <p id="uploadInfo" class="muted"></p>
+        <video id="preview" controls class="hidden"></video>
+        <div class="meta" id="videoMeta"></div>
+        <button id="btnCancelUpload" class="btn danger small hidden">Cancel Upload</button>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <div class="card">
+        <h2><i class="fa-brands fa-youtube"></i> YouTube Stream Settings</h2>
+        <form id="settingsForm">
+          <label>YouTube RTMP Server URL <input name="rtmp_url" value="rtmp://a.rtmp.youtube.com/live2" required></label>
+          <label>Stream Key <input name="stream_key" type="password" placeholder="Paste from YouTube Studio → Go Live" autocomplete="off">
+            <small id="keyHint">Saved key: not set yet. After saving, only ****last 4 digits are shown.</small></label>
+          <label>Stream Title <input name="title" value="TR Live 24/7"></label>
+          <label>Stream Description <textarea name="description" rows="3" placeholder="Live description (for your reference — YouTube title/description are set in YouTube Studio)"></textarea></label>
+          <div class="row2">
+            <label>Category <select name="category"><option>Entertainment</option><option>Music</option><option>Gaming</option><option>Education</option><option>News &amp; Politics</option><option>People &amp; Blogs</option></select></label>
+            <label>Privacy <select name="privacy"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select></label>
+          </div>
+          <h3>Encoding</h3>
+          <div class="row3">
+            <label>Resolution <select name="resolution"><option>480p</option><option selected>720p</option><option>1080p</option></select></label>
+            <label>FPS <select name="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label>
+            <label>Duration (hours) <input name="duration_hours" type="number" min="1" max="24" step="1" value="24"></label>
+          </div>
+          <div class="row3">
+            <label>Video Bitrate <select name="video_bitrate_kbps"><option value="1500">1500 kbps</option><option value="2500" selected>2500 kbps</option><option value="4500">4500 kbps</option><option value="6000">6000 kbps</option></select></label>
+            <label>Audio Bitrate <select name="audio_bitrate_kbps"><option value="128" selected>128 kbps</option><option value="160">160 kbps</option><option value="192">192 kbps</option></select></label>
+          </div>
+          <button class="btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- MONITOR -->
+    <section class="page" id="page-monitor">
+      <div class="grid stats">
+        <div class="card"><label>LIVE / OFFLINE</label><strong id="mLive">OFFLINE</strong></div>
+        <div class="card"><label>Elapsed</label><strong id="mElapsed">00:00:00</strong></div>
+        <div class="card"><label>Remaining</label><strong id="mRemaining">—</strong></div>
+        <div class="card"><label>Current Bitrate</label><strong id="mBitrate">—</strong></div>
+        <div class="card"><label>FFmpeg PID</label><strong id="mPid">—</strong></div>
+        <div class="card"><label>FFmpeg Restarts</label><strong id="mRestarts">0</strong></div>
+        <div class="card"><label>Server CPU</label><strong id="mCpu">—</strong></div>
+        <div class="card"><label>Server Memory</label><strong id="mMem">—</strong></div>
+        <div class="card"><label>Last Error</label><strong id="mError" class="err">—</strong></div>
+      </div>
+      <p class="muted">Polls <code>GET /api/status</code> every 2s and <code>GET /api/server-stats</code> every 5s. No fake status — if the backend is down, this shows OFFLINE.</p>
+    </section>
+
+    <!-- LOGS -->
+    <section class="page" id="page-logs">
+      <div class="card">
+        <h2><i class="fa-solid fa-list"></i> Live Logs <button id="btnClearLogs" class="btn small danger" style="float:right">Clear Logs</button></h2>
+        <pre id="logBox" class="logs">Waiting for backend…</pre>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
